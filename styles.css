@@ -223,7 +223,7 @@ hr {
 }
 
 #gridCanvas {
-    pointer-events: none;
+    /* Grid canvas needs to receive mouse events for drawing */
 }
 
 /* Color Panel */
