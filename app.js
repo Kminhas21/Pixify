@@ -199,7 +199,9 @@ class PixelDrawApp {
 
         this.isDrawing = true;
         this.saveState();
-        this.drawPixel(coords.x, coords.y);
+        if (this.drawPixel(coords.x, coords.y)) {
+            this.render();
+        }
         this.lastPixel = coords;
     }
 
@@ -223,18 +225,16 @@ class PixelDrawApp {
         this.lastPixel = null;
     }
 
-    // Draw a single pixel
+    // Draw a single pixel (updates data only, caller must render)
     drawPixel(x, y) {
-        if (x < 0 || x >= this.canvasSize || y < 0 || y >= this.canvasSize) return;
+        if (x < 0 || x >= this.canvasSize || y < 0 || y >= this.canvasSize) return false;
 
         const color = this.currentTool === 'eraser' ? 'transparent' : this.currentColor;
 
-        if (this.canvasData[y][x] === color) return; // No change needed
+        if (this.canvasData[y][x] === color) return false; // No change needed
 
         this.canvasData[y][x] = color;
-
-        // Re-render to update pixel and grid
-        this.render();
+        return true; // Pixel was changed
     }
 
     // Bresenham's line algorithm for smooth drawing
@@ -244,9 +244,12 @@ class PixelDrawApp {
         const sx = x0 < x1 ? 1 : -1;
         const sy = y0 < y1 ? 1 : -1;
         let err = dx - dy;
+        let changed = false;
 
         while (true) {
-            this.drawPixel(x0, y0);
+            if (this.drawPixel(x0, y0)) {
+                changed = true;
+            }
 
             if (x0 === x1 && y0 === y1) break;
 
@@ -259,6 +262,11 @@ class PixelDrawApp {
                 err += dx;
                 y0 += sy;
             }
+        }
+
+        // Only render once after all pixels are drawn
+        if (changed) {
+            this.render();
         }
     }
 
@@ -548,6 +556,10 @@ class PixelDrawApp {
         exportCanvas.width = exportSize;
         exportCanvas.height = exportSize;
         const ctx = exportCanvas.getContext('2d');
+
+        // Fill background with white
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, exportSize, exportSize);
 
         // Draw each pixel at scaled size
         for (let y = 0; y < this.canvasSize; y++) {
