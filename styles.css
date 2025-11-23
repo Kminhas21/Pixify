@@ -220,10 +220,11 @@ hr {
     image-rendering: pixelated;
     image-rendering: -moz-crisp-edges;
     image-rendering: crisp-edges;
+    pointer-events: none;
 }
 
 #gridCanvas {
-    /* Grid canvas needs to receive mouse events for drawing */
+    pointer-events: auto;
 }
 
 /* Color Panel */
