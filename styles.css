@@ -208,22 +208,9 @@ hr {
     overflow: hidden;
 }
 
-#pixelCanvas,
-#gridCanvas {
+#canvas {
     display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-}
-
-#pixelCanvas {
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
-}
-
-#gridCanvas {
-    /* Grid canvas needs to receive mouse events for drawing */
+    cursor: crosshair;
 }
 
 /* Color Panel */

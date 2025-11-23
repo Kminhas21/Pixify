@@ -2,11 +2,9 @@
 class PixelDrawApp {
     constructor() {
         // Canvas elements
-        this.pixelCanvas = document.getElementById('pixelCanvas');
-        this.gridCanvas = document.getElementById('gridCanvas');
+        this.canvas = document.getElementById('canvas');
         this.canvasWrapper = document.getElementById('canvasWrapper');
-        this.pixelCtx = this.pixelCanvas.getContext('2d', { willReadFrequently: true });
-        this.gridCtx = this.gridCanvas.getContext('2d');
+        this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
 
         // Canvas settings
         this.canvasSize = 32;
@@ -67,65 +65,63 @@ class PixelDrawApp {
     updateCanvasSize() {
         const totalSize = this.canvasSize * this.pixelSize;
 
-        this.pixelCanvas.width = this.canvasSize;
-        this.pixelCanvas.height = this.canvasSize;
-        this.gridCanvas.width = totalSize;
-        this.gridCanvas.height = totalSize;
-
-        this.pixelCanvas.style.width = totalSize + 'px';
-        this.pixelCanvas.style.height = totalSize + 'px';
+        this.canvas.width = totalSize;
+        this.canvas.height = totalSize;
 
         this.canvasWrapper.style.width = totalSize + 'px';
         this.canvasWrapper.style.height = totalSize + 'px';
 
         this.render();
-        this.renderGrid();
     }
 
-    // Render the pixel canvas
+    // Render the canvas (pixels + grid)
     render() {
+        const totalSize = this.canvasSize * this.pixelSize;
+
         // Clear canvas
-        this.pixelCtx.clearRect(0, 0, this.canvasSize, this.canvasSize);
+        this.ctx.clearRect(0, 0, totalSize, totalSize);
 
         // Draw each pixel
         for (let y = 0; y < this.canvasSize; y++) {
             for (let x = 0; x < this.canvasSize; x++) {
                 const color = this.canvasData[y][x];
                 if (color !== 'transparent') {
-                    this.pixelCtx.fillStyle = color;
-                    this.pixelCtx.fillRect(x, y, 1, 1);
+                    this.ctx.fillStyle = color;
+                    this.ctx.fillRect(
+                        x * this.pixelSize,
+                        y * this.pixelSize,
+                        this.pixelSize,
+                        this.pixelSize
+                    );
                 }
+            }
+        }
+
+        // Draw grid overlay
+        if (this.showGrid) {
+            this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            this.ctx.lineWidth = 1;
+
+            // Draw vertical lines
+            for (let x = 0; x <= this.canvasSize; x++) {
+                const xPos = x * this.pixelSize;
+                this.ctx.beginPath();
+                this.ctx.moveTo(xPos, 0);
+                this.ctx.lineTo(xPos, totalSize);
+                this.ctx.stroke();
+            }
+
+            // Draw horizontal lines
+            for (let y = 0; y <= this.canvasSize; y++) {
+                const yPos = y * this.pixelSize;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, yPos);
+                this.ctx.lineTo(totalSize, yPos);
+                this.ctx.stroke();
             }
         }
     }
 
-    // Render grid overlay
-    renderGrid() {
-        this.gridCtx.clearRect(0, 0, this.gridCanvas.width, this.gridCanvas.height);
-
-        if (!this.showGrid) return;
-
-        this.gridCtx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
-        this.gridCtx.lineWidth = 1;
-
-        // Draw vertical lines
-        for (let x = 0; x <= this.canvasSize; x++) {
-            const xPos = x * this.pixelSize;
-            this.gridCtx.beginPath();
-            this.gridCtx.moveTo(xPos, 0);
-            this.gridCtx.lineTo(xPos, this.gridCanvas.height);
-            this.gridCtx.stroke();
-        }
-
-        // Draw horizontal lines
-        for (let y = 0; y <= this.canvasSize; y++) {
-            const yPos = y * this.pixelSize;
-            this.gridCtx.beginPath();
-            this.gridCtx.moveTo(0, yPos);
-            this.gridCtx.lineTo(this.gridCanvas.width, yPos);
-            this.gridCtx.stroke();
-        }
-    }
 
     // Initialize drawing tools
     initTools() {
@@ -139,10 +135,10 @@ class PixelDrawApp {
         });
 
         // Canvas mouse events
-        this.gridCanvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
-        this.gridCanvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-        this.gridCanvas.addEventListener('mouseup', () => this.handleMouseUp());
-        this.gridCanvas.addEventListener('mouseleave', () => this.handleMouseUp());
+        this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+        this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+        this.canvas.addEventListener('mouseup', () => this.handleMouseUp());
+        this.canvas.addEventListener('mouseleave', () => this.handleMouseUp());
 
         // Undo/Redo/Clear
         document.getElementById('undoBtn').addEventListener('click', () => this.undo());
@@ -171,12 +167,12 @@ class PixelDrawApp {
             fill: 'cursor-fill'
         };
 
-        this.gridCanvas.className = cursors[this.currentTool] || '';
+        this.canvas.className = cursors[this.currentTool] || '';
     }
 
     // Get pixel coordinates from mouse event
     getPixelCoords(e) {
-        const rect = this.gridCanvas.getBoundingClientRect();
+        const rect = this.canvas.getBoundingClientRect();
         const x = Math.floor((e.clientX - rect.left) / this.pixelSize);
         const y = Math.floor((e.clientY - rect.top) / this.pixelSize);
 
@@ -203,7 +199,9 @@ class PixelDrawApp {
 
         this.isDrawing = true;
         this.saveState();
-        this.drawPixel(coords.x, coords.y);
+        if (this.drawPixel(coords.x, coords.y)) {
+            this.render();
+        }
         this.lastPixel = coords;
     }
 
@@ -227,22 +225,16 @@ class PixelDrawApp {
         this.lastPixel = null;
     }
 
-    // Draw a single pixel
+    // Draw a single pixel (updates data only, caller must render)
     drawPixel(x, y) {
-        if (x < 0 || x >= this.canvasSize || y < 0 || y >= this.canvasSize) return;
+        if (x < 0 || x >= this.canvasSize || y < 0 || y >= this.canvasSize) return false;
 
         const color = this.currentTool === 'eraser' ? 'transparent' : this.currentColor;
 
-        if (this.canvasData[y][x] === color) return; // No change needed
+        if (this.canvasData[y][x] === color) return false; // No change needed
 
         this.canvasData[y][x] = color;
-
-        // Render just this pixel
-        this.pixelCtx.clearRect(x, y, 1, 1);
-        if (color !== 'transparent') {
-            this.pixelCtx.fillStyle = color;
-            this.pixelCtx.fillRect(x, y, 1, 1);
-        }
+        return true; // Pixel was changed
     }
 
     // Bresenham's line algorithm for smooth drawing
@@ -252,9 +244,12 @@ class PixelDrawApp {
         const sx = x0 < x1 ? 1 : -1;
         const sy = y0 < y1 ? 1 : -1;
         let err = dx - dy;
+        let changed = false;
 
         while (true) {
-            this.drawPixel(x0, y0);
+            if (this.drawPixel(x0, y0)) {
+                changed = true;
+            }
 
             if (x0 === x1 && y0 === y1) break;
 
@@ -267,6 +262,11 @@ class PixelDrawApp {
                 err += dx;
                 y0 += sy;
             }
+        }
+
+        // Only render once after all pixels are drawn
+        if (changed) {
+            this.render();
         }
     }
 
@@ -492,7 +492,7 @@ class PixelDrawApp {
 
         gridToggle.addEventListener('change', (e) => {
             this.showGrid = e.target.checked;
-            this.renderGrid();
+            this.render();
         });
     }
 
@@ -556,6 +556,10 @@ class PixelDrawApp {
         exportCanvas.width = exportSize;
         exportCanvas.height = exportSize;
         const ctx = exportCanvas.getContext('2d');
+
+        // Fill background with white
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, exportSize, exportSize);
 
         // Draw each pixel at scaled size
         for (let y = 0; y < this.canvasSize; y++) {
